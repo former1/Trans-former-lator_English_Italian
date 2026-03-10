@@ -1,0 +1,148 @@
+import os
+import argparse
+from datasets import load_dataset, load_from_disk
+from tokenizer import ItalianTokenizer
+from transformers import AutoTokenizer
+
+path_to_save= "/Users/omer/Desktop/dataset_hf"
+
+def build_english2italian_dataset(path_to_save, test_prop=0.005, cache_dir=None):
+    """
+    Loads the Helsinki-NLP/opus-mt-tc-big-en-it dataset directly from HuggingFace.
+    The dataset has a 'translation' column with dicts: {"en": ..., "it": ...}.
+    We flatten this into separate 'english_src' and 'italian_tgt' columns to match
+    our tokenization pipeline.
+    """
+    print("Loading Helsinki-NLP/opus-mt-tc-big-en-it from HuggingFace...")
+    dataset = load_dataset("Helsinki-NLP/opus-100", "en-it", cache_dir=cache_dir)
+
+    def flatten_translation(example):
+        return {
+            "english_src": example["translation"]["en"],
+            "italian_tgt": example["translation"]["it"]
+        }
+
+    dataset = dataset.map(flatten_translation, remove_columns=["translation"])
+
+    # Create a test split if one doesn't exist
+    if "test" not in dataset:
+        dataset = dataset["train"].train_test_split(test_size=test_prop)
+
+    print(dataset)
+    dataset.save_to_disk(path_to_save)
+
+
+def tokenize_english2italian_dataset(
+    path_to_hf_data,
+    path_to_save,
+    num_workers=24,
+    truncate=True,
+    max_length=512,
+    min_length=5
+):
+    """
+    Pre-tokenizes the English→Italian dataset before training.
+
+    - English source: tokenized with bert-base-uncased (same as before)
+    - Italian target: tokenized with our custom ItalianTokenizer (WordPiece, trained locally)
+
+    Sequences shorter than min_length on the target side are filtered out to avoid
+    near-empty examples that would hurt causal language modeling.
+    """
+    italian_tokenizer = ItalianTokenizer(
+        "trained_tokenizer/italian_wp.json",
+        truncate=truncate,
+        max_length=max_length
+    )
+    english_tokenizer = AutoTokenizer.from_pretrained("google-bert/bert-base-uncased")
+
+    raw_dataset = load_from_disk(path_to_hf_data)
+
+    def _tokenize_text(examples):
+        english_text = examples["english_src"]
+        italian_text = examples["italian_tgt"]
+
+        src_ids = english_tokenizer(
+            english_text,
+            truncation=True,
+            max_length=max_length
+        )["input_ids"]
+
+        # ItalianTokenizer.encode handles both str and list
+        tgt_ids = italian_tokenizer.encode(italian_text)
+
+        return {"src_ids": src_ids, "tgt_ids": tgt_ids}
+
+    tokenized_dataset = raw_dataset.map(
+        _tokenize_text,
+        batched=True,
+        num_proc=num_workers
+    )
+
+    tokenized_dataset = tokenized_dataset.remove_columns(["english_src", "italian_tgt"])
+
+    # Filter out targets that are too short (min_length includes BOS/EOS added by ItalianTokenizer)
+    filter_func = lambda batch: [len(e) > min_length for e in batch["tgt_ids"]]
+    tokenized_dataset = tokenized_dataset.filter(filter_func, batched=True)
+
+    print(tokenized_dataset)
+    tokenized_dataset.save_to_disk(path_to_save)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="English→Italian Translation Data Prep")
+    parser.add_argument(
+        "--test_split_pct",
+        default=0.005,
+        help="Fraction of data to use as test set (only if no test split exists in the dataset)",
+        type=float
+    )
+    parser.add_argument(
+        "--max_length",
+        default=512,
+        help="Max token sequence length. Must match the value used during model training.",
+        type=int
+    )
+    parser.add_argument(
+        "--min_length",
+        default=5,
+        help="Removes target sequences shorter than this (includes BOS/EOS tokens)",
+        type=int
+    )
+    parser.add_argument(
+        "--path_to_save",
+        required=True,
+        help="Root directory to save raw and tokenized datasets",
+        type=str
+    )
+    parser.add_argument(
+        "--huggingface_cache_dir",
+        default=None,
+        help="Optional custom HuggingFace cache directory",
+        type=str
+    )
+    parser.add_argument(
+        "--num_workers",
+        default=24,
+        help="Number of parallel workers for dataset processing",
+        type=int
+    )
+
+    args = parser.parse_args()
+
+    path_to_raw       = os.path.join(args.path_to_save, "raw_english2italian_corpus")
+    path_to_tokenized = os.path.join(args.path_to_save, "tokenized_english2italian_corpus")
+
+    build_english2italian_dataset(
+        path_to_raw,
+        test_prop=args.test_split_pct,
+        cache_dir=args.huggingface_cache_dir
+    )
+
+    tokenize_english2italian_dataset(
+        path_to_raw,
+        path_to_tokenized,
+        truncate=True,
+        max_length=args.max_length,
+        min_length=args.min_length,
+        num_workers=args.num_workers
+    )
