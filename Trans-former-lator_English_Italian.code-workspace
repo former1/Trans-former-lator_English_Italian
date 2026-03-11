@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "Trans-former-lator_English_Italian",
+			"path": "."
+		},
+		{
+			"name": "trained_tokenizer",
+			"path": "../../../Desktop/transformer_lator/trained_tokenizer"
+		}
+	],
+	"settings": {}
+}

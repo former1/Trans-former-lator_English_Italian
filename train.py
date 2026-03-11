@@ -11,7 +11,7 @@ from model import Transformer,TransformerConfig
 from data import TranslationCollator
 from tokenizer import ItalianTokenizer
 
-device = torch.device("mps")
+device = torch.device("cuda")
 
 def main():
         
@@ -23,8 +23,8 @@ def main():
     attention_dropout_p =0.0
     hidden_dropout_p=0.0
     mlp_ratio=4
-    encoder_depth =6
-    decoder_depth =6
+    encoder_depth =8
+    decoder_depth =8
     max_src_len=512 
     max_tgt_len= 512
     learn_pos_embed = False
@@ -33,13 +33,13 @@ def main():
     src_tokenizer=AutoTokenizer.from_pretrained("google-bert/bert-base-uncased")
 
     #path_to_data="/Users/omer/Desktop/dataset_hf/tokenized_english2italian_corpus"
-    path_to_data="/content/tokenized_english2italian_corpus"
+    path_to_data="/root/tokenized_english2italian_corpus"
 
-    batch_size = 16
-    gradient_acc_steps = 2  
+    batch_size = 64
+    gradient_acc_steps = 4
     #batch_size=4
     #gradient_acc_steps=2
-    num_workers=2
+    num_workers=8
 
     learning_rate=1e-4
     num_training_steps=50000
@@ -51,7 +51,7 @@ def main():
     betas=(0.9,0.98)
     adam_eps=1e-6
 
-    working_directory = "/kaggle/working/work_dir"
+    working_directory="/root/work_dir"
     experiment_name="Translate_IT_to_ENG"
     logging_interval=1
 
@@ -60,7 +60,8 @@ def main():
 
     # Train
     path_to_experiment=os.path.join(working_directory, experiment_name)
-    accelerator = Accelerator(project_dir=path_to_experiment)  # remove log_with="wandb"
+    os.makedirs(path_to_experiment, exist_ok=True)
+    accelerator = Accelerator(project_dir=path_to_experiment, mixed_precision="fp16")
 
     #accelerator.init_trackers(experiment_name)
     config= TransformerConfig(embedding_dimension=embedding_dimension,
