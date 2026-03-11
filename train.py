@@ -23,8 +23,8 @@ def main():
     attention_dropout_p =0.0
     hidden_dropout_p=0.0
     mlp_ratio=4
-    encoder_depth =8
-    decoder_depth =8
+    encoder_depth =6
+    decoder_depth =6
     max_src_len=512 
     max_tgt_len= 512
     learn_pos_embed = False
@@ -33,25 +33,25 @@ def main():
     src_tokenizer=AutoTokenizer.from_pretrained("google-bert/bert-base-uncased")
 
     #path_to_data="/Users/omer/Desktop/dataset_hf/tokenized_english2italian_corpus"
-    path_to_data="/root/tokenized_english2italian_corpus"
+    path_to_data="/workspace/tokenized_english2italian_corpus"
 
     batch_size = 64
     gradient_acc_steps = 4
     #batch_size=4
     #gradient_acc_steps=2
-    num_workers=8
+    num_workers=4
 
     learning_rate=1e-4
     num_training_steps=50000
     num_warmup_steps=2000
     scheduler_type="cosine"
-    evaluation_steps=250
+    evaluation_steps=5000
     bias_norm_weight_decay= False
     weight_decay=0.001
     betas=(0.9,0.98)
     adam_eps=1e-6
 
-    working_directory="/root/work_dir"
+    working_directory="/workspace/work_dir"    
     experiment_name="Translate_IT_to_ENG"
     logging_interval=1
 
@@ -270,9 +270,15 @@ def main():
                     if accelerator.is_main_process:
                         progress_bar.write(logging_string)
                     
-                    ### Log and Save Model ###
                     accelerator.log(log, step=completed_steps)
-                    accelerator.save_state(os .path.join(path_to_experiment, f"checkpoint_{completed_steps}"))
+                    
+                    # Delete previous checkpoint to save disk space
+                    import shutil
+                    for item in os.listdir(path_to_experiment):
+                        if item.startswith("checkpoint_"):
+                            shutil.rmtree(os.path.join(path_to_experiment, item))
+                    
+                    accelerator.save_state(os.path.join(path_to_experiment, f"checkpoint_{completed_steps}"))
 
                     # Testing Sentence
                     if accelerator.is_main_process:
