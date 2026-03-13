@@ -164,3 +164,60 @@ pip install torch transformers datasets accelerate tokenizers numpy tqdm wandb
 - Vaswani et al. (2017) — [Attention Is All You Need](https://arxiv.org/abs/1706.03762)
 - [HuggingFace Transformers](https://github.com/huggingface/transformers)
 - [Helsinki-NLP/opus-100 dataset](https://huggingface.co/datasets/Helsinki-NLP/opus-100)
+
+
+## Results
+
+After training for **50,000 steps**, the model achieved the following evaluation performance on the **OPUS-100 English–Italian test set**.
+
+### BLEU Score
+
+**BLEU: 21.76**
+
+---
+
+### Sample Translations
+
+**[1]**
+
+|                  |                                          |
+| ---------------- | ---------------------------------------- |
+| **Input**        | I spoke like a real public servant.      |
+| **Model Output** | ho parlato come un vero servo pubblico.  |
+| **Reference**    | parli come una vera dipendente pubblica. |
+
+---
+
+**[2]**
+
+|                  |                                                                            |
+| ---------------- | -------------------------------------------------------------------------- |
+| **Input**        | I wrote you a letter when I was at the academy.                            |
+| **Model Output** | ti ho scritto una lettera quando ero all ' accademia.                      |
+| **Reference**    | e ' un piacere conoscerla. le... le ho scritto quando ero all ' accademia. |
+
+---
+
+**[3]**
+
+|                  |                                          |
+| ---------------- | ---------------------------------------- |
+| **Input**        | The bomber sneaks into the shop...       |
+| **Model Output** | - gli scopiti nel negozio...             |
+| **Reference**    | il bombarolo si intrufola nel negozio... |
+
+---
+
+### Observations
+
+* The model captures **core semantic structure** in most sentences.
+* Minor issues appear in:
+
+  * **Morphological agreement** (gender/number)
+  * **Word choice ambiguity**
+  * **Tokenization artifacts** (`'` spacing)
+* Despite these limitations, the model produces **grammatically plausible Italian translations** for many inputs.
+
+These results demonstrate that a **from-scratch Transformer with ~92M parameters** can learn meaningful translation behavior using the OPUS-100 dataset and a modest training setup.
+
+---
