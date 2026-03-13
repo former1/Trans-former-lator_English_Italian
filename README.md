@@ -138,27 +138,6 @@ print(tgt_tokenizer.decode(output_ids, skip_special_tokens=True))
 ```
 
 ---
-
-## Requirements
-
-```
-torch
-transformers
-datasets
-accelerate
-tokenizers
-numpy
-tqdm
-wandb  # optional, for experiment tracking
-```
-
-Install with:
-```bash
-pip install torch transformers datasets accelerate tokenizers numpy tqdm wandb
-```
-
----
-
 ## References
 
 - Vaswani et al. (2017) — [Attention Is All You Need](https://arxiv.org/abs/1706.03762)
@@ -219,5 +198,25 @@ After training for **50,000 steps**, the model achieved the following evaluation
 * Despite these limitations, the model produces **grammatically plausible Italian translations** for many inputs.
 
 These results demonstrate that a **from-scratch Transformer with ~92M parameters** can learn meaningful translation behavior using the OPUS-100 dataset and a modest training setup.
+
+---
+
+## Requirements
+
+```
+torch
+transformers
+datasets
+accelerate
+tokenizers
+numpy
+tqdm
+wandb  # optional, for experiment tracking
+```
+
+Install with:
+```bash
+pip install torch transformers datasets accelerate tokenizers numpy tqdm wandb
+```
 
 ---
