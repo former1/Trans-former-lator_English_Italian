@@ -57,7 +57,7 @@ class Embeddings(nn.Module):
 
         self.src_embeddings= nn.Embedding(config.src_vocab_size, config.embedding_dimension)
         self.tgt_embeddings= nn.Embedding(config.tgt_vocab_size, config.embedding_dimension)
-# We'll define two pos_encodings bcs it might be the case that u have different max lengths for two languages
+        # We'll define two pos_encodings bcs it might be the case that u have different max lengths for two languages
         self.src_positional_encodings= PositionalEncoding(config.max_src_len,
                                                           config.embedding_dimension,
                                                           config.learn_pos_embed)
@@ -107,17 +107,16 @@ class Attention(nn.Module):
             v = self.v_proj(src).reshape(batch, src_len, self.config.num_attention_heads, self.head_dim).transpose(1,2).contiguous()
 
             if causal:
-                # Build causal mask manually so we can combine it with padding mask
-                causal_mask = torch.ones(src_len, src_len, dtype=torch.bool, device=src.device).tril()  # (src_len, src_len)
+                # build causal mask manually so we can combine it with padding mask
+                causal_mask = torch.ones(src_len, src_len, dtype=torch.bool, device=src.device).tril()  
                 if attention_mask is not None:
-                    pad_mask = attention_mask.bool().unsqueeze(1).unsqueeze(2)  # (batch, 1, 1, src_len)
-                    combined_mask = causal_mask.unsqueeze(0).unsqueeze(0) & pad_mask  # (batch, 1, src_len, src_len)
-                else:
+                    pad_mask = attention_mask.bool().unsqueeze(1).unsqueeze(2) 
+                    combined_mask = causal_mask.unsqueeze(0).unsqueeze(0) & pad_mask 
                     combined_mask = causal_mask
                 attention_out = F.scaled_dot_product_attention(q, k, v,
                                                             attn_mask=combined_mask,
                                                             dropout_p=self.config.attention_dropout_p if self.training else 0.0,
-                                                            is_causal=False)  # False — causal handled via attn_mask
+                                                            is_causal=False) 
             else:
                 if attention_mask is not None:
                     attention_mask = attention_mask.bool().unsqueeze(1).unsqueeze(1).repeat(1, 1, src_len, 1)
@@ -208,19 +207,19 @@ class TransformerDecoder(nn.Module):
         self.final_layer_norm = nn.LayerNorm(config.embedding_dimension)
 
     def forward(self, encoder_out, tgt, src_mask=None, tgt_mask=None):
-        # 1. Masked self-attention on target sequence
+        # self-attention part
         tgt = tgt + self.decoder_attention_dropout(
             self.decoder_attention(src=tgt, attention_mask=tgt_mask, causal=True)
         )
         tgt = self.decoder_attention_layer_norm(tgt)
 
-        # 2. Cross-attention: queries from decoder, keys/values from encoder
+        # cross attention part
         tgt = tgt + self.cross_attention_dropout(
             self.cross_attention(src=encoder_out, tgt=tgt, attention_mask=src_mask)
         )
         tgt = self.cross_attention_layer_norm(tgt)
 
-        # 3. FFN
+        # 3. ffn
         tgt = tgt + self.feed_forward(tgt)
         tgt = self.final_layer_norm(tgt)
 
@@ -268,7 +267,7 @@ class Transformer(nn.Module):
         pred= self.head(tgt_embeddings)
         return pred
     
-    def inference(self, src_ids, tgt_start_id=2, tgt_end_id=3, max_len=8): # flag: will change max len
+    def inference(self, src_ids, tgt_start_id=2, tgt_end_id=3, max_len=8):
         with torch.no_grad():                 
             tgt_ids= torch.tensor([tgt_start_id], device=src_ids.device).reshape(1,1)
             src_embeddings= self.encodings.forward_src(src_ids)
@@ -276,7 +275,7 @@ class Transformer(nn.Module):
             for layer in self.encoder:
                 src_embeddings= layer(src_embeddings)
 
-            for i in range(max_len-1): # we already started with [BOS] so we add -1
+            for i in range(max_len-1): # deleting the BOS with -1
 
                 tgt_embeddings= self.encodings.forward_tgt(tgt_ids)
 
@@ -293,6 +292,55 @@ class Transformer(nn.Module):
                     break
             
             return tgt_ids.squeeze().cpu().tolist()
+        
+    def beam_search(self, src_ids, tgt_start_id=2, tgt_end_id=3, max_len=100, beam_size=4):
+        with torch.no_grad():
+            device = src_ids.device
+
+            # Encode source once
+            src_embeddings = self.encodings.forward_src(src_ids)
+            for layer in self.encoder:
+                src_embeddings = layer(src_embeddings)
+
+            # Each beam: (score, token_ids)
+            beams = [(0.0, [tgt_start_id])]
+            completed = []
+
+            for _ in range(max_len):
+                candidates = []
+
+                for score, tokens in beams:
+                    if tokens[-1] == tgt_end_id:
+                        completed.append((score, tokens))
+                        continue
+
+                    tgt_ids = torch.tensor(tokens, device=device).unsqueeze(0)
+                    tgt_embeddings = self.encodings.forward_tgt(tgt_ids)
+
+                    for layer in self.decoder:
+                        tgt_embeddings = layer(src_embeddings, tgt_embeddings)
+
+                    logits = self.head(tgt_embeddings[:, -1])
+                    log_probs = torch.log_softmax(logits, dim=-1).squeeze(0)
+
+                    # Take top beam_size tokens
+                    topk_log_probs, topk_ids = log_probs.topk(beam_size)
+
+                    for log_prob, token_id in zip(topk_log_probs.tolist(), topk_ids.tolist()):
+                        candidates.append((score + log_prob, tokens + [token_id]))
+
+                if not candidates:
+                    break
+
+                # Keep top beam_size beams
+                beams = sorted(candidates, key=lambda x: x[0], reverse=True)[:beam_size]
+
+            # Add any unfinished beams to completed
+            completed += beams
+            
+            # Return best sequence (normalize by length to avoid bias toward short sequences)
+            best = max(completed, key=lambda x: x[0] / len(x[1]))
+            return best[1]
 
 @torch.no_grad()
 def _init_weights_(module): # from hugginface implemetation_roberta.py, kind of initialization transformers like :)

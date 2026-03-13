@@ -234,21 +234,17 @@ def main():
                                         src_pad_mask, 
                                         tgt_pad_mask)
                         
-                        ### Flatten for Loss ###
                         output = output.flatten(0,1)
                         tgt_outputs = tgt_outputs.flatten()
                         
-                        ### Compute Loss ###
                         loss = loss_fn(output, tgt_outputs)
 
-                        ### Compute Accuracy (make sure to ignore -100 targets) ###
                         output = output.argmax(axis=-1)
                         mask = (tgt_outputs != -100)
                         output = output[mask]
                         tgt_outputs = tgt_outputs[mask]
                         accuracy = (output == tgt_outputs).sum() / len(output)   
 
-                        ### Store Results ###
                         loss = loss.detach()
                         accuracy = accuracy.detach()
 
@@ -256,7 +252,6 @@ def main():
                             loss = torch.mean(accelerator.gather_for_metrics(loss))
                             accuracy = torch.mean(accelerator.gather_for_metrics(accuracy))
                 
-                        ### Store Metrics ###
                         test_losses.append(loss.item())
                         test_accs.append(accuracy.item())
 
@@ -272,7 +267,7 @@ def main():
                     
                     accelerator.log(log, step=completed_steps)
                     
-                    # Delete previous checkpoint to save disk space
+                    # delete previous checkpoint to save space
                     import shutil
                     for item in os.listdir(path_to_experiment):
                         if item.startswith("checkpoint_"):
@@ -280,7 +275,7 @@ def main():
                     
                     accelerator.save_state(os.path.join(path_to_experiment, f"checkpoint_{completed_steps}"))
 
-                    # Testing Sentence
+                    # testing sentence
                     if accelerator.is_main_process:
                         src_ids = src_ids.to(accelerator.device)
                         unwrapped= accelerator.unwrap_model(model)

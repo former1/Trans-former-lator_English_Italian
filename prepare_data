@@ -7,12 +7,7 @@ from transformers import AutoTokenizer
 path_to_save= "/Users/omer/Desktop/dataset_hf"
 
 def build_english2italian_dataset(path_to_save, test_prop=0.005, cache_dir=None):
-    """
-    Loads the Helsinki-NLP/opus-mt-tc-big-en-it dataset directly from HuggingFace.
-    The dataset has a 'translation' column with dicts: {"en": ..., "it": ...}.
-    We flatten this into separate 'english_src' and 'italian_tgt' columns to match
-    our tokenization pipeline.
-    """
+
     print("Loading Helsinki-NLP/opus-mt-tc-big-en-it from HuggingFace...")
     dataset = load_dataset("Helsinki-NLP/opus-100", "en-it", cache_dir=cache_dir)
 
@@ -40,15 +35,6 @@ def tokenize_english2italian_dataset(
     max_length=512,
     min_length=5
 ):
-    """
-    Pre-tokenizes the English→Italian dataset before training.
-
-    - English source: tokenized with bert-base-uncased (same as before)
-    - Italian target: tokenized with our custom ItalianTokenizer (WordPiece, trained locally)
-
-    Sequences shorter than min_length on the target side are filtered out to avoid
-    near-empty examples that would hurt causal language modeling.
-    """
     italian_tokenizer = ItalianTokenizer(
         "trained_tokenizer/italian_wp.json",
         truncate=truncate,
@@ -68,7 +54,6 @@ def tokenize_english2italian_dataset(
             max_length=max_length
         )["input_ids"]
 
-        # ItalianTokenizer.encode handles both str and list
         tgt_ids = italian_tokenizer.encode(italian_text)
 
         return {"src_ids": src_ids, "tgt_ids": tgt_ids}
@@ -81,7 +66,6 @@ def tokenize_english2italian_dataset(
 
     tokenized_dataset = tokenized_dataset.remove_columns(["english_src", "italian_tgt"])
 
-    # Filter out targets that are too short (min_length includes BOS/EOS added by ItalianTokenizer)
     filter_func = lambda batch: [len(e) > min_length for e in batch["tgt_ids"]]
     tokenized_dataset = tokenized_dataset.filter(filter_func, batched=True)
 
