@@ -13,7 +13,7 @@ from data import TranslationCollator
 CHECKPOINT_PATH = "final_checkpoint/model.safetensors"
 DATA_PATH       = "/Users/omer/Desktop/dataset_hf/tokenized_english2italian_corpus"
 TOKENIZER_PATH  = "trained_tokenizer/italian_wp.json"
-NUM_SAMPLES     = 500      
+NUM_SAMPLES     = 1000      
 MAX_GEN_LEN     = 100     
 BATCH_SIZE      = 1        
 DEVICE          = "mps"   
